@@ -1,0 +1,2 @@
+# GoHang
+Hangman in Go
