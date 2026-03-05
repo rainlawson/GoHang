@@ -6,6 +6,7 @@ package main
 import (
 	_ "embed"
 	"image"
+	"image/color"
 	"log"
 	"math/rand"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 // --- Globals ---
@@ -35,6 +37,7 @@ type Game struct {
 	height  int
 	state   int
 	lastEsc time.Time
+	guessed map[rune]bool
 }
 
 const (
@@ -85,6 +88,7 @@ func NewGame(w, h int) *Game {
 		height:  h,
 		state:   menu,
 		lastEsc: time.Now(),
+		guessed: make(map[rune]bool),
 	}
 }
 
@@ -148,6 +152,18 @@ func (g *Game) Update() error {
 				g.lastEsc = now
 			}
 		}
+
+		for k := ebiten.KeyA; k <= ebiten.KeyZ; k++ {
+			if ebiten.IsKeyPressed(k) {
+
+				letter := rune('a' + (k - ebiten.KeyA))
+
+				if !g.guessed[letter] {
+					g.guessed[letter] = true
+					println("Guessed:", string(letter))
+				}
+			}
+		}
 	}
 
 	return nil
@@ -175,12 +191,51 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrint(screen, helpText)
 
 	case game:
-		ebitenutil.DebugPrint(screen, "Game running")
 		ebitenutil.DebugPrint(screen, "Random word: "+g.word)
+
+		// Base
+		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
+
+		// Vertical beam
+		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
+
+		// Top beam
+		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
+
+		// Rope
+		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+
+		ebitenutil.DebugPrintAt(screen, "Word length: "+string(len(g.word)), 50, 50)
+		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
 	}
 }
 
 // "Defines (*Game).Layout function. Layout accepts an outside size, which is a window size on desktop, and returns the game's logical screen size."
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	return g.width, g.height // Vibe coded
+}
+
+func (g *Game) correctGuess(letter rune) bool {
+	for _, c := range g.word {
+		if c == letter {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) displayWord() string {
+
+	result := ""
+
+	for _, c := range g.word {
+
+		if g.guessed[c] {
+			result += string(c) + " "
+		} else {
+			result += "_ "
+		}
+	}
+
+	return result
 }
