@@ -1,0 +1,16 @@
+Welcome to GoHang, my experimental implementation of Hangman in Go.
+
+Controls:
+- Esc: Go back to the main menu -
+- Enter a letter to guess -
+
+Rules:
+- Press "Game" on main menu to start a new game -
+- Guess the word by entering letters one at a time -
+- You have a limited number of incorrect guesses before you lose -
+- Correct guesses reveal the letter in the word -
+- Incorrect guesses draw a part of the hangman -
+- The game ends when you guess the word or run out of guesses -
+
+FAIR WARNING:
+- If you back out of a game, you will lose your progress, and a new word will be chosen -
