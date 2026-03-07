@@ -5,6 +5,7 @@ package main
 
 import (
 	_ "embed"
+	"fmt"
 	"image"
 	"image/color"
 	"log"
@@ -37,7 +38,14 @@ type Game struct {
 	height  int
 	state   int
 	lastEsc time.Time
+	// So, rune is kind of an interesting data type. Go doesn't have a char type, only rune, which is actually stored as an int32
+	// ChatGPT: "var c rune = 'a' is actually var c int32 = 97 because 'a' has Unicode codepoint 97."
+	// In short there are no chars, only bytes (uint8) and runes (int32)
+	// Strings are byte sequences, but some unicode characters are multiple bytes, necessitating runes
+	// "s := "hello" Internally this is: 68 65 6c 6c 6f But Unicode characters can be multiple bytes. Example: é"
+	// So, essentially, the following line just creates a map that accepts any unicode characters, and maps them to bools as the value to the key:value pair
 	guessed map[rune]bool
+	// Btw UTF-8 stands for Unicode Transformation Format - 8-bit, so it's shortened to just "unicode"
 }
 
 const (
@@ -79,7 +87,6 @@ func main() {
 // WARNING: Vibe Coded
 func NewGame(w, h int) *Game {
 	// Returning a pointer to a new Game struct
-	rand.Seed(time.Now().UnixNano())
 
 	words := strings.Split(strings.TrimSpace(wordData), "\n")
 	return &Game{
@@ -164,6 +171,8 @@ func (g *Game) Update() error {
 				}
 			}
 		}
+
+		// TODO: Insert victory & defeat condition checker here
 	}
 
 	return nil
@@ -193,20 +202,17 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	case game:
 		ebitenutil.DebugPrint(screen, "Random word: "+g.word)
 
-		// Base
+		// Drawing gallows
 		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
-
-		// Vertical beam
 		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
-
-		// Top beam
 		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
-
-		// Rope
 		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
 
-		ebitenutil.DebugPrintAt(screen, "Word length: "+string(len(g.word)), 50, 50)
+		// This line I think is broken, "Word length: " appears but nothing after it
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
+		// This line creates the word spaces on the screen, but generates one extra space after the word
 		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		// TODO: insert call to incorrectGuess helper function to draw the hangman figure
 	}
 }
 
@@ -215,6 +221,7 @@ func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	return g.width, g.height // Vibe coded
 }
 
+// This code is not ever being called
 func (g *Game) correctGuess(letter rune) bool {
 	for _, c := range g.word {
 		if c == letter {
@@ -224,10 +231,16 @@ func (g *Game) correctGuess(letter rune) bool {
 	return false
 }
 
+// TODO: incorrectGuess helper function (prolly need an incorrect guess counter global)
+
+// This is called when a letter is guessed
 func (g *Game) displayWord() string {
 
 	result := ""
 
+	// Hack job solution
+	//wordRange := len(g.word) - 1
+	// This generates one extra space after the word
 	for _, c := range g.word {
 
 		if g.guessed[c] {
@@ -239,3 +252,5 @@ func (g *Game) displayWord() string {
 
 	return result
 }
+
+// TODO: add victory & defeat condition checker function
