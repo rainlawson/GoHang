@@ -46,6 +46,7 @@ type Game struct {
 	// So, essentially, the following line just creates a map that accepts any unicode characters, and maps them to bools as the value to the key:value pair
 	guessed map[rune]bool
 	// Btw UTF-8 stands for Unicode Transformation Format - 8-bit, so it's shortened to just "unicode"
+	incorrectGuesses int
 }
 
 const (
@@ -88,7 +89,10 @@ func main() {
 func NewGame(w, h int) *Game {
 	// Returning a pointer to a new Game struct
 
-	words := strings.Split(strings.TrimSpace(wordData), "\n")
+	// words := strings.Split(strings.TrimSpace(wordData), "\n")
+	// TrimSpace removes leading/trailing whitespace for the file, but isn't recognizing DOS /r/n endlines, only /n
+	// Fields splits on any whitespace
+	words := strings.Fields(wordData)
 	return &Game{
 		word:    words[rand.Intn(len(words))],
 		width:   w,
@@ -168,6 +172,10 @@ func (g *Game) Update() error {
 				if !g.guessed[letter] {
 					g.guessed[letter] = true
 					println("Guessed:", string(letter))
+					// Incorrect guess handling
+					if !g.correctGuess(letter) {
+						g.incorrectGuesses++
+					}
 				}
 			}
 		}
@@ -208,11 +216,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
 		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
 
-		// This line I think is broken, "Word length: " appears but nothing after it
+		// Debug stuff
 		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
 		// This line creates the word spaces on the screen, but generates one extra space after the word
 		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
-		// TODO: insert call to incorrectGuess helper function to draw the hangman figure
+		// Call to drawHangman helper function to draw the hangman figure
+		g.drawHangman(screen)
 	}
 }
 
@@ -231,7 +241,41 @@ func (g *Game) correctGuess(letter rune) bool {
 	return false
 }
 
-// TODO: incorrectGuess helper function (prolly need an incorrect guess counter global)
+// By the way, didn't notice this before but the (g *Game) thing indicates that drawHangman is a method of the Game struct
+func (g *Game) drawHangman(screen *ebiten.Image) {
+	// Check number of incorrect guesses and draw the corresponding hangman figure
+	if g.incorrectGuesses >= 1 {
+		// Head
+		vector.StrokeCircle(screen, 302, 370, 30, 2, color.White, false)
+		// print("Drawing Head")
+	}
+	if g.incorrectGuesses >= 2 {
+		// Body
+		vector.StrokeLine(screen, 302, 400, 302, 500, 2, color.White, false)
+		// print("Drawing Body")
+	}
+	if g.incorrectGuesses >= 3 {
+		// Left arm
+		vector.StrokeLine(screen, 302, 420, 260, 460, 2, color.White, false)
+		// print("Drawing Left Arm")
+	}
+	if g.incorrectGuesses >= 4 {
+		// Right arm
+		vector.StrokeLine(screen, 302, 420, 344, 460, 2, color.White, false)
+		// print("Drawing Right Arm")
+	}
+	if g.incorrectGuesses >= 5 {
+		// Left leg
+		vector.StrokeLine(screen, 302, 500, 260, 560, 2, color.White, false)
+		// print("Drawing Left Leg")
+	}
+	if g.incorrectGuesses >= 6 {
+		// Right leg
+		vector.StrokeLine(screen, 302, 500, 344, 560, 2, color.White, false)
+		// print("Drawing Right Leg")
+	}
+	// Thank you claude, this would have taken me forever to trial and error
+}
 
 // This is called when a letter is guessed
 func (g *Game) displayWord() string {
@@ -240,7 +284,6 @@ func (g *Game) displayWord() string {
 
 	// Hack job solution
 	//wordRange := len(g.word) - 1
-	// This generates one extra space after the word
 	for _, c := range g.word {
 
 		if g.guessed[c] {
