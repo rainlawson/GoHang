@@ -53,6 +53,8 @@ const (
 	menu = iota
 	help
 	game
+	victory
+	loss
 )
 
 // "iota" make this equivalent to:
@@ -113,6 +115,12 @@ func (g *Game) Update() error {
 	x, y := ebiten.CursorPosition()
 
 	if g.state == menu {
+		// TODO: Make this only when transitioning to menu
+		words := strings.Fields(wordData)
+		g.word = words[rand.Intn(len(words))]
+		g.guessed = make(map[rune]bool)
+		g.incorrectGuesses = 0
+
 		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 
 			if inside(x, y, startRect) {
@@ -180,7 +188,41 @@ func (g *Game) Update() error {
 			}
 		}
 
-		// TODO: Insert victory & defeat condition checker here
+		// Victory condition checker
+		if g.allLettersGuessed() {
+			g.state = victory
+			print("Victory!")
+		}
+		// Defeat condition checker
+		if g.incorrectGuesses >= 6 {
+			g.state = loss
+			print("Defeat!")
+		}
+	}
+
+	if g.state == victory {
+		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+			now := time.Now()
+
+			if now.Sub(g.lastEsc) > 2*time.Second {
+				println("ESC")
+				g.state = menu
+				g.lastEsc = now
+			}
+		}
+	}
+
+	if g.state == loss {
+		// TODO: Implement restart logic in here and make it a separate function
+		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+			now := time.Now()
+
+			if now.Sub(g.lastEsc) > 2*time.Second {
+				println("ESC")
+				g.state = menu
+				g.lastEsc = now
+			}
+		}
 	}
 
 	return nil
@@ -208,7 +250,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrint(screen, helpText)
 
 	case game:
-		ebitenutil.DebugPrint(screen, "Random word: "+g.word)
+		// TODO: make these a separate function so it isn't repeated
 
 		// Drawing gallows
 		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
@@ -223,6 +265,58 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
 		// Call to drawHangman helper function to draw the hangman figure
 		g.drawHangman(screen)
+
+	case victory:
+		// ebitenutil.DebugPrint(screen, "Random word: "+g.word)
+
+		// Drawing gallows
+		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
+		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
+		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
+		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+
+		// Debug stuff
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
+		// This line creates the word spaces on the screen, but generates one extra space after the word
+		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		// Call to drawHangman helper function to draw the hangman figure
+		g.drawHangman(screen)
+		victoryMsg := "You won!"
+		wordMsg := fmt.Sprintf("The word was: %s", g.word)
+		guessMsg := fmt.Sprintf("Incorrect guesses: %d/6", g.incorrectGuesses)
+		escMsg := "Press ESC to return to menu"
+
+		ebitenutil.DebugPrintAt(screen, victoryMsg, (g.width-len(victoryMsg)*6)/2, g.height-80)
+		ebitenutil.DebugPrintAt(screen, wordMsg, (g.width-len(wordMsg)*6)/2, g.height-60)
+		ebitenutil.DebugPrintAt(screen, guessMsg, (g.width-len(guessMsg)*6)/2, g.height-40)
+		ebitenutil.DebugPrintAt(screen, escMsg, (g.width-len(escMsg)*6)/2, g.height-20)
+
+	case loss:
+		// ebitenutil.DebugPrint(screen, "Random word: "+g.word)
+
+		// Drawing gallows
+		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
+		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
+		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
+		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+
+		// Debug stuff
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
+		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
+		// This line creates the word spaces on the screen, but generates one extra space after the word
+		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		// Call to drawHangman helper function to draw the hangman figure
+		g.drawHangman(screen)
+		lossMsg := "You lost! :("
+		wordMsg := fmt.Sprintf("The word was: %s", g.word)
+		guessMsg := fmt.Sprintf("Incorrect guesses: %d/6", g.incorrectGuesses)
+		escMsg := "Press ESC to return to menu"
+
+		ebitenutil.DebugPrintAt(screen, lossMsg, (g.width-len(lossMsg)*6)/2, g.height-80)
+		ebitenutil.DebugPrintAt(screen, wordMsg, (g.width-len(wordMsg)*6)/2, g.height-60)
+		ebitenutil.DebugPrintAt(screen, guessMsg, (g.width-len(guessMsg)*6)/2, g.height-40)
+		ebitenutil.DebugPrintAt(screen, escMsg, (g.width-len(escMsg)*6)/2, g.height-20)
 	}
 }
 
@@ -231,7 +325,7 @@ func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	return g.width, g.height // Vibe coded
 }
 
-// This code is not ever being called
+// Checking if a letter is in the word
 func (g *Game) correctGuess(letter rune) bool {
 	for _, c := range g.word {
 		if c == letter {
@@ -296,4 +390,11 @@ func (g *Game) displayWord() string {
 	return result
 }
 
-// TODO: add victory & defeat condition checker function
+func (g *Game) allLettersGuessed() bool {
+	for _, c := range g.word {
+		if !g.guessed[c] {
+			return false
+		}
+	}
+	return true
+}
