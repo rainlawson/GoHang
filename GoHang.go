@@ -115,11 +115,6 @@ func (g *Game) Update() error {
 	x, y := ebiten.CursorPosition()
 
 	if g.state == menu {
-		// TODO: Make this only when transitioning to menu
-		words := strings.Fields(wordData)
-		g.word = words[rand.Intn(len(words))]
-		g.guessed = make(map[rune]bool)
-		g.incorrectGuesses = 0
 
 		if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 
@@ -150,79 +145,34 @@ func (g *Game) Update() error {
 	}
 
 	if g.state == help {
-		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-			now := time.Now()
-
-			if now.Sub(g.lastEsc) > 2*time.Second {
-				println("ESC")
-				g.state = menu
-				g.lastEsc = now
-			}
-		}
+		g.back2Menu()
 	}
 
 	if g.state == game {
-		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-			now := time.Now()
+		// Check for ESC key press to quit to menu
+		g.back2Menu()
 
-			if now.Sub(g.lastEsc) > 2*time.Second {
-				println("ESC")
-				g.state = menu
-				g.lastEsc = now
-			}
-		}
-
-		for k := ebiten.KeyA; k <= ebiten.KeyZ; k++ {
-			if ebiten.IsKeyPressed(k) {
-
-				letter := rune('a' + (k - ebiten.KeyA))
-
-				if !g.guessed[letter] {
-					g.guessed[letter] = true
-					println("Guessed:", string(letter))
-					// Incorrect guess handling
-					if !g.correctGuess(letter) {
-						g.incorrectGuesses++
-					}
-				}
-			}
-		}
+		g.gameKeyPressChecker()
 
 		// Victory condition checker
 		if g.allLettersGuessed() {
 			g.state = victory
-			print("Victory!")
+			print("Victory!\n")
 		}
 		// Defeat condition checker
 		if g.incorrectGuesses >= 6 {
 			g.state = loss
-			print("Defeat!")
+			print("Defeat!\n")
 		}
 	}
 
 	if g.state == victory {
-		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-			now := time.Now()
-
-			if now.Sub(g.lastEsc) > 2*time.Second {
-				println("ESC")
-				g.state = menu
-				g.lastEsc = now
-			}
-		}
+		g.back2Menu()
 	}
 
 	if g.state == loss {
-		// TODO: Implement restart logic in here and make it a separate function
-		if ebiten.IsKeyPressed(ebiten.KeyEscape) {
-			now := time.Now()
-
-			if now.Sub(g.lastEsc) > 2*time.Second {
-				println("ESC")
-				g.state = menu
-				g.lastEsc = now
-			}
-		}
+		// Seems 2 work
+		g.back2Menu()
 	}
 
 	return nil
@@ -231,6 +181,16 @@ func (g *Game) Update() error {
 // Helper function to check if a point is inside a rectangle
 func inside(x, y int, r image.Rectangle) bool {
 	return x >= r.Min.X && x <= r.Max.X && y >= r.Min.Y && y <= r.Max.Y
+}
+
+// Check for victory condition: all letters guessed correctly
+func (g *Game) allLettersGuessed() bool {
+	for _, c := range g.word {
+		if !g.guessed[c] {
+			return false
+		}
+	}
+	return true
 }
 
 // "Defines (*Game).Draw function, that is called every frame" "Takes an *ebiten.Image as an argument"
@@ -250,89 +210,45 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		ebitenutil.DebugPrint(screen, helpText)
 
 	case game:
-		// TODO: make these a separate function so it isn't repeated
 
-		// Drawing gallows
-		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
-		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+		g.drawGallows(screen)
 
-		// Debug stuff
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
-		// This line creates the word spaces on the screen, but generates one extra space after the word
-		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		g.drawWordAndInfo(screen)
+
 		// Call to drawHangman helper function to draw the hangman figure
 		g.drawHangman(screen)
 
 	case victory:
 		// ebitenutil.DebugPrint(screen, "Random word: "+g.word)
 
-		// Drawing gallows
-		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
-		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+		g.drawGallows(screen)
 
-		// Debug stuff
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
-		// This line creates the word spaces on the screen, but generates one extra space after the word
-		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		g.drawWordAndInfo(screen)
+
 		// Call to drawHangman helper function to draw the hangman figure
 		g.drawHangman(screen)
-		victoryMsg := "You won!"
-		wordMsg := fmt.Sprintf("The word was: %s", g.word)
-		guessMsg := fmt.Sprintf("Incorrect guesses: %d/6", g.incorrectGuesses)
-		escMsg := "Press ESC to return to menu"
 
-		ebitenutil.DebugPrintAt(screen, victoryMsg, (g.width-len(victoryMsg)*6)/2, g.height-80)
-		ebitenutil.DebugPrintAt(screen, wordMsg, (g.width-len(wordMsg)*6)/2, g.height-60)
-		ebitenutil.DebugPrintAt(screen, guessMsg, (g.width-len(guessMsg)*6)/2, g.height-40)
-		ebitenutil.DebugPrintAt(screen, escMsg, (g.width-len(escMsg)*6)/2, g.height-20)
+		victoryMsg := "You won!"
+		g.drawGameOverScreen(screen, victoryMsg)
 
 	case loss:
 		// ebitenutil.DebugPrint(screen, "Random word: "+g.word)
 
-		// Drawing gallows
-		vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
-		vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
-		vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+		g.drawGallows(screen)
 
-		// Debug stuff
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
-		ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
-		// This line creates the word spaces on the screen, but generates one extra space after the word
-		ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+		g.drawWordAndInfo(screen)
+
 		// Call to drawHangman helper function to draw the hangman figure
 		g.drawHangman(screen)
 		lossMsg := "You lost! :("
-		wordMsg := fmt.Sprintf("The word was: %s", g.word)
-		guessMsg := fmt.Sprintf("Incorrect guesses: %d/6", g.incorrectGuesses)
-		escMsg := "Press ESC to return to menu"
+		g.drawGameOverScreen(screen, lossMsg)
 
-		ebitenutil.DebugPrintAt(screen, lossMsg, (g.width-len(lossMsg)*6)/2, g.height-80)
-		ebitenutil.DebugPrintAt(screen, wordMsg, (g.width-len(wordMsg)*6)/2, g.height-60)
-		ebitenutil.DebugPrintAt(screen, guessMsg, (g.width-len(guessMsg)*6)/2, g.height-40)
-		ebitenutil.DebugPrintAt(screen, escMsg, (g.width-len(escMsg)*6)/2, g.height-20)
 	}
 }
 
 // "Defines (*Game).Layout function. Layout accepts an outside size, which is a window size on desktop, and returns the game's logical screen size."
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	return g.width, g.height // Vibe coded
-}
-
-// Checking if a letter is in the word
-func (g *Game) correctGuess(letter rune) bool {
-	for _, c := range g.word {
-		if c == letter {
-			return true
-		}
-	}
-	return false
 }
 
 // By the way, didn't notice this before but the (g *Game) thing indicates that drawHangman is a method of the Game struct
@@ -371,13 +287,90 @@ func (g *Game) drawHangman(screen *ebiten.Image) {
 	// Thank you claude, this would have taken me forever to trial and error
 }
 
+// Optimization / cleanup functions
+
+// Only used for game, victory, loss, or help states, NOT for menu state
+func (g *Game) back2Menu() {
+
+	// Check if the player just pressed ESC
+	if ebiten.IsKeyPressed(ebiten.KeyEscape) {
+		now := time.Now()
+
+		// Compare current time with last ESC press time to prevent auto quitting the game
+		if now.Sub(g.lastEsc) > 2*time.Second {
+			println("ESC")
+			// Set the game state and reset game data
+			g.state = menu
+			g.lastEsc = now
+			words := strings.Fields(wordData)
+			g.word = words[rand.Intn(len(words))]
+			g.guessed = make(map[rune]bool)
+			g.incorrectGuesses = 0
+		}
+	}
+}
+
+func (g *Game) gameKeyPressChecker() {
+	for k := ebiten.KeyA; k <= ebiten.KeyZ; k++ {
+		if ebiten.IsKeyPressed(k) {
+
+			// This is weird because the way Go handles characters is via runes (UTF-8 code points)
+			// so this acts like a int + offset deal which converts any key to lowercase
+			// From claude:
+			// "ebiten.KeyA is just an integer constant representing the A key — let's say it's 65 (the actual value doesn't matter, just that the keys A through Z are consecutive integers)
+			// k - ebiten.KeyA gives you the offset of whichever key you're on — so KeyA gives 0, KeyB gives 1, KeyC gives 2, and so on up to KeyZ giving 25
+			// 'a' + offset then adds that offset to the rune value of lowercase 'a' (which is 97 in Unicode), giving you 97 for 'a', 98 for 'b', 99 for 'c', etc.
+			// The outer rune(...) is just an explicit type cast to make Go happy, since the arithmetic produces a plain integer"
+			letter := rune('a' + (k - ebiten.KeyA))
+
+			// If it's not in the guessed map, add it
+			if !g.guessed[letter] {
+				g.guessed[letter] = true
+				println("Guessed:", string(letter))
+				// Incorrect guess handling
+				if !g.correctGuess(letter) {
+					g.incorrectGuesses++
+				}
+			}
+		}
+	}
+}
+
+// Checking if a letter is in the word
+func (g *Game) correctGuess(letter rune) bool {
+	for _, c := range g.word {
+		if c == letter {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Game) drawGallows(screen *ebiten.Image) {
+	// Drawing gallows
+	vector.DrawFilledRect(screen, 100, 500, 200, 10, color.White, false)
+	vector.DrawFilledRect(screen, 180, 300, 10, 200, color.White, false)
+	vector.DrawFilledRect(screen, 180, 300, 120, 10, color.White, false)
+	vector.DrawFilledRect(screen, 300, 300, 2, 40, color.White, false)
+}
+
+func (g *Game) drawWordAndInfo(screen *ebiten.Image) {
+	// Info for user
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Word length: %d", len(g.word)), 50, 50)
+	ebitenutil.DebugPrintAt(screen, fmt.Sprintf("Incorrect Guesses: %d", g.incorrectGuesses), 50, 70)
+	// This line creates the word spaces on the screen, but generates one extra space after the word
+	ebitenutil.DebugPrintAt(screen, g.displayWord(), 300, 100)
+}
+
 // This is called when a letter is guessed
 func (g *Game) displayWord() string {
 
 	result := ""
 
-	// Hack job solution
-	//wordRange := len(g.word) - 1
+	// "range on a string iterates over it character by character, yielding two values on each iteration
+	// — the byte index of the character, and the character itself as a rune. The _ is Go's blank identifier,
+	// meaning "I don't care about this value, throw it away." So _, c means "give me the character but discard the index."
+	// c then holds each rune in the word one at a time."
 	for _, c := range g.word {
 
 		if g.guessed[c] {
@@ -387,14 +380,21 @@ func (g *Game) displayWord() string {
 		}
 	}
 
+	// Fix the trailing space before returning
+	strings.TrimRight(result, " ")
 	return result
 }
 
-func (g *Game) allLettersGuessed() bool {
-	for _, c := range g.word {
-		if !g.guessed[c] {
-			return false
-		}
-	}
-	return true
+func (g *Game) drawGameOverScreen(screen *ebiten.Image, finalMsg string) {
+
+	wordMsg := fmt.Sprintf("The word was: %s", g.word)
+	guessMsg := fmt.Sprintf("Incorrect guesses: %d/6", g.incorrectGuesses)
+	escMsg := "Press ESC to return to menu"
+
+	ebitenutil.DebugPrintAt(screen, finalMsg, (g.width-len(finalMsg)*6)/2, g.height-80)
+	ebitenutil.DebugPrintAt(screen, wordMsg, (g.width-len(wordMsg)*6)/2, g.height-60)
+	ebitenutil.DebugPrintAt(screen, guessMsg, (g.width-len(guessMsg)*6)/2, g.height-40)
+	ebitenutil.DebugPrintAt(screen, escMsg, (g.width-len(escMsg)*6)/2, g.height-20)
 }
+
+// didn't actually save that much space by refactoring, lol
